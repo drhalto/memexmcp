@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-04-20
+
+### Changed
+- **Major GUI refresh.** New global stylesheet (modern Windows-friendly light theme, navy accent from the app icon), consistent margins and spacing across all pages, better type hierarchy.
+- **Drop zone** — larger (140 px tall), hover feedback on drag-over, clearer primary + secondary text.
+- **Source table** — alternating row colors, right-aligned thousands-formatted counts, tooltip on long paths, hidden gridlines, comfortable row height. Empty-state placeholder when no sources are in the collection yet.
+- **Buttons** get a primary / danger / secondary hierarchy. "Embed all" is the obvious CTA; "Remove selected" reads as destructive.
+- **Progress bar** is taller, shows percentage and current file name inline, hides itself after a successful run.
+- **Status bar** at the bottom of the main window now carries transient feedback instead of a cramped label above the progress bar. Inline message feedback replaces most `QMessageBox` popups.
+- **Settings tier picker** replaces cramped one-line radios with card-style rows: title, size/dim meta, one-line description, and a "RECOMMENDED" badge on Small.
+- **Setup wizard** gets the same visual language: hero header with the app icon on Welcome, tier cards on the Tier page, bigger install button on the Ollama page, percentage + MB display while downloading, more breathing room throughout.
+- Sidebar has a proper title, padded list, and preserves selection across collection list refreshes.
+
+### Added
+- `memex.style` module with the shared QSS stylesheet and `apply_style()` helper.
+- `TierCard` widget reused across Settings and the wizard.
+
+### Fixed
+- Collection list selection no longer jumps to the top on refresh.
+- Collection header no longer shows a placeholder em-dash on first paint.
+
 ## [0.1.0] - 2026-04-20
 
 First public release.
@@ -30,5 +51,6 @@ First public release.
 - Gemini API keys are stored in **Windows Credential Manager** under service `memex`, user `gemini-api-key` — never written to disk.
 - Frozen exes are unsigned. SmartScreen will warn on first run unless the downloaded zip is **Unblocked** (right-click → Properties → Unblock) before extraction.
 
-[Unreleased]: https://github.com/drhalto/memexmcp/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/drhalto/memexmcp/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/drhalto/memexmcp/releases/tag/v0.1.1
 [0.1.0]: https://github.com/drhalto/memexmcp/releases/tag/v0.1.0
