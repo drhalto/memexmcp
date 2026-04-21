@@ -39,6 +39,10 @@ from memex.mcp_config import server_snippet
 from memex.paths import config_path, ensure_dirs, home
 
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
 def _resource_path(rel: str) -> Path:
     base = getattr(sys, "_MEIPASS", None)
     if base:
@@ -51,10 +55,6 @@ def _repolish(w: QWidget) -> None:
     w.style().polish(w)
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 def ollama_exe_path() -> Path:
     local = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
     return Path(local) / "Programs" / "Ollama" / "ollama.exe"
@@ -66,10 +66,7 @@ def should_show_wizard() -> bool:
 
 def _h1(text: str) -> QLabel:
     lbl = QLabel(text)
-    f = QFont()
-    f.setPointSize(18)
-    f.setWeight(QFont.Weight.DemiBold)
-    lbl.setFont(f)
+    lbl.setProperty("h1", True)
     return lbl
 
 
@@ -113,7 +110,7 @@ class _DownloadWorker(QObject):
 
 
 # ---------------------------------------------------------------------------
-# Tier card (mirrors the one in gui.py — simplified for the wizard's flow)
+# Tier card
 # ---------------------------------------------------------------------------
 
 class _TierCard(QFrame):
@@ -132,20 +129,21 @@ class _TierCard(QFrame):
         self.setProperty("selected", False)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setMinimumHeight(82)
 
         outer = QHBoxLayout(self)
-        outer.setContentsMargins(14, 12, 14, 12)
-        outer.setSpacing(12)
+        outer.setContentsMargins(16, 14, 16, 14)
+        outer.setSpacing(14)
 
         self.radio = QRadioButton()
         self.radio.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         outer.addWidget(self.radio, alignment=Qt.AlignmentFlag.AlignTop)
 
         body = QVBoxLayout()
-        body.setSpacing(2)
+        body.setSpacing(4)
 
         head = QHBoxLayout()
-        head.setSpacing(8)
+        head.setSpacing(10)
         name = QLabel(tier.label)
         nf = QFont()
         nf.setPointSize(11)
@@ -181,35 +179,67 @@ class _TierCard(QFrame):
 
 
 # ---------------------------------------------------------------------------
+# Page bases
+# ---------------------------------------------------------------------------
+
+class _Page(QWizardPage):
+    """Base wizard page that uses our own header instead of Qt's banner."""
+
+    HEADING = "Page"
+    SUBTITLE: str | None = None
+
+    def __init__(self) -> None:
+        super().__init__()
+        # Empty Qt title so the wizard's own banner stays minimal.
+        self.setTitle(" ")
+
+        self._root = QVBoxLayout(self)
+        self._root.setContentsMargins(8, 8, 8, 8)
+        self._root.setSpacing(14)
+
+        self._build_header()
+        self.build_body(self._root)
+        self._root.addStretch(1)
+
+    def _build_header(self) -> None:
+        self._root.addWidget(_h1(self.HEADING))
+        if self.SUBTITLE:
+            self._root.addWidget(_muted(self.SUBTITLE))
+
+    def build_body(self, lay: QVBoxLayout) -> None:
+        """Subclasses fill this in."""
+
+
+# ---------------------------------------------------------------------------
 # Pages
 # ---------------------------------------------------------------------------
 
-class WelcomePage(QWizardPage):
-    def __init__(self) -> None:
-        super().__init__()
-        self.setTitle(" ")  # the page title label is small; we do our own h1
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(8, 8, 8, 8)
-        lay.setSpacing(14)
+class WelcomePage(_Page):
+    HEADING = "Welcome to Memex"
+    SUBTITLE = "Local semantic search for your codebases and documents."
 
-        # Hero row: icon + heading
+    def _build_header(self) -> None:
+        # Hero with icon on the left, title + subtitle on the right.
         hero = QHBoxLayout()
-        hero.setSpacing(16)
+        hero.setSpacing(18)
         icon_path = _resource_path("assets/icon.png")
         if icon_path.exists():
             icon_lbl = QLabel()
             pix = QPixmap(str(icon_path)).scaled(
-                72, 72, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation,
+                88, 88,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
             )
             icon_lbl.setPixmap(pix)
             hero.addWidget(icon_lbl, alignment=Qt.AlignmentFlag.AlignTop)
-        title_col = QVBoxLayout()
-        title_col.setSpacing(2)
-        title_col.addWidget(_h1("Welcome to Memex"))
-        title_col.addWidget(_muted("Local semantic search for your codebases and documents."))
-        hero.addLayout(title_col, stretch=1)
-        lay.addLayout(hero)
+        col = QVBoxLayout()
+        col.setSpacing(4)
+        col.addWidget(_h1(self.HEADING))
+        col.addWidget(_muted(self.SUBTITLE))
+        hero.addLayout(col, stretch=1)
+        self._root.addLayout(hero)
 
+    def build_body(self, lay: QVBoxLayout) -> None:
         body = QLabel(
             "Memex indexes your files into vector embeddings on this PC, then "
             "exposes them over MCP so Claude (or any MCP client) can search them.\n\n"
@@ -223,23 +253,16 @@ class WelcomePage(QWizardPage):
         )
         body.setWordWrap(True)
         lay.addWidget(body)
-        lay.addStretch(1)
 
 
-class TierPage(QWizardPage):
-    def __init__(self) -> None:
-        super().__init__()
-        self.setTitle(" ")
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(8, 8, 8, 8)
-        lay.setSpacing(12)
+class TierPage(_Page):
+    HEADING = "Pick an embedding tier"
+    SUBTITLE = (
+        "You can switch tiers later in Settings. Switching across vector dims "
+        "re-embeds existing chunks automatically."
+    )
 
-        lay.addWidget(_h1("Pick an embedding tier"))
-        lay.addWidget(_muted(
-            "You can switch tiers later in Settings. Switching across vector dims "
-            "re-embeds existing chunks automatically."
-        ))
-
+    def build_body(self, lay: QVBoxLayout) -> None:
         self._cards: dict[str, _TierCard] = {}
         for key in ("small", "medium", "large"):
             card = _TierCard(key, TIERS[key], recommended=(key == "small"))
@@ -247,8 +270,6 @@ class TierPage(QWizardPage):
             lay.addWidget(card)
             self._cards[key] = card
         self._cards["small"].setSelected(True)
-
-        lay.addStretch(1)
 
     def _on_card_clicked(self, tier_key: str) -> None:
         for k, c in self._cards.items():
@@ -265,29 +286,33 @@ class TierPage(QWizardPage):
         return True
 
 
-class KeyPage(QWizardPage):
-    def __init__(self) -> None:
-        super().__init__()
-        self.setTitle(" ")
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(8, 8, 8, 8)
-        lay.setSpacing(12)
+class KeyPage(_Page):
+    HEADING = "Gemini API key"
+    SUBTITLE = "Optional. Skip if you only want local models."
 
-        lay.addWidget(_h1("Gemini API key"))
-        lay.addWidget(_muted("Optional. Paste a key to enable cloud embeddings."))
+    def build_body(self, lay: QVBoxLayout) -> None:
+        card = QFrame()
+        card.setObjectName("tierCard")  # reuse the white card styling
+        cl = QVBoxLayout(card)
+        cl.setContentsMargins(16, 14, 16, 14)
+        cl.setSpacing(10)
+
+        label = QLabel("Paste a key to enable Gemini cloud embeddings.")
+        cl.addWidget(label)
 
         self.edit = QLineEdit()
         self.edit.setEchoMode(QLineEdit.EchoMode.Password)
         self.edit.setPlaceholderText("Leave blank to skip")
-        lay.addWidget(self.edit)
+        cl.addWidget(self.edit)
 
         note = _muted(
             "The key is stored in Windows Credential Manager (service: 'memex', "
             "user: 'gemini-api-key') and never written to disk. You can change "
             "or remove it anytime in Settings."
         )
-        lay.addWidget(note)
-        lay.addStretch(1)
+        cl.addWidget(note)
+
+        lay.addWidget(card)
 
     def validatePage(self) -> bool:
         key = self.edit.text().strip()
@@ -300,30 +325,27 @@ class KeyPage(QWizardPage):
         return True
 
 
-class OllamaPage(QWizardPage):
-    def __init__(self) -> None:
-        super().__init__()
-        self.setTitle(" ")
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(8, 8, 8, 8)
-        lay.setSpacing(12)
+class OllamaPage(_Page):
+    HEADING = "Install Ollama"
+    SUBTITLE = "Memex uses Ollama to run local embedding models."
 
-        lay.addWidget(_h1("Ollama"))
-        lay.addWidget(_muted(
-            "Memex uses Ollama to run local embedding models. We'll detect or "
-            "install it now."
-        ))
+    def build_body(self, lay: QVBoxLayout) -> None:
+        card = QFrame()
+        card.setObjectName("tierCard")
+        cl = QVBoxLayout(card)
+        cl.setContentsMargins(16, 16, 16, 16)
+        cl.setSpacing(12)
 
         self.status = QLabel("Checking…")
         sf = QFont()
         sf.setPointSize(11)
         self.status.setFont(sf)
-        lay.addWidget(self.status)
+        cl.addWidget(self.status)
 
         self.bar = QProgressBar()
         self.bar.setVisible(False)
         self.bar.setTextVisible(True)
-        lay.addWidget(self.bar)
+        cl.addWidget(self.bar)
 
         btn_row = QHBoxLayout()
         btn_row.addStretch(1)
@@ -331,9 +353,9 @@ class OllamaPage(QWizardPage):
         self.install_btn.setProperty("primary", True)
         self.install_btn.clicked.connect(self._start_install)
         btn_row.addWidget(self.install_btn)
-        lay.addLayout(btn_row)
+        cl.addLayout(btn_row)
 
-        lay.addStretch(1)
+        lay.addWidget(card)
 
         self._ready = False
         self._thread: QThread | None = None
@@ -349,7 +371,7 @@ class OllamaPage(QWizardPage):
     def _check(self) -> None:
         exe = ollama_exe_path()
         if exe.exists():
-            self.status.setText(f"✓ Ollama is installed.\n   {exe}")
+            self.status.setText(f"✓  Ollama is installed.\n     {exe}")
             self.install_btn.setVisible(False)
             self.bar.setVisible(False)
             self._ready = True
@@ -407,29 +429,33 @@ class OllamaPage(QWizardPage):
         QTimer.singleShot(3000, self._check)
 
 
-class PullPage(QWizardPage):
-    def __init__(self) -> None:
-        super().__init__()
-        self.setTitle(" ")
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(8, 8, 8, 8)
-        lay.setSpacing(12)
+class PullPage(_Page):
+    HEADING = "Downloading the embedding model"
+    SUBTITLE = "Fetching the model. This takes a few minutes."
 
-        lay.addWidget(_h1("Downloading the embedding model"))
-        self.status_lbl = _muted("Starting…")
-        lay.addWidget(self.status_lbl)
+    def build_body(self, lay: QVBoxLayout) -> None:
+        card = QFrame()
+        card.setObjectName("tierCard")
+        cl = QVBoxLayout(card)
+        cl.setContentsMargins(16, 16, 16, 16)
+        cl.setSpacing(12)
+
+        self.status_lbl = QLabel("Starting…")
+        cl.addWidget(self.status_lbl)
 
         self.bar = QProgressBar()
         self.bar.setRange(0, 100)
         self.bar.setTextVisible(True)
         self.bar.setFormat("%p%")
-        lay.addWidget(self.bar)
+        cl.addWidget(self.bar)
 
         self.log = QTextEdit()
         self.log.setReadOnly(True)
         self.log.setMinimumHeight(180)
         self.log.setFont(QFont("Consolas", 9))
-        lay.addWidget(self.log)
+        cl.addWidget(self.log)
+
+        lay.addWidget(card)
 
         self._done = False
         self._proc: QProcess | None = None
@@ -473,7 +499,7 @@ class PullPage(QWizardPage):
     def _on_done(self, code: int, _status: object) -> None:
         if code == 0:
             self.bar.setValue(100)
-            self.status_lbl.setText(f"✓ {self._model} downloaded.")
+            self.status_lbl.setText(f"✓  {self._model} downloaded.")
         else:
             self.status_lbl.setText(f"ollama exited with code {code}")
             self.log.insertPlainText(f"\n[ollama exited with {code}]\n")
@@ -481,25 +507,22 @@ class PullPage(QWizardPage):
         self.completeChanged.emit()
 
 
-class DonePage(QWizardPage):
-    def __init__(self) -> None:
-        super().__init__()
-        self.setTitle(" ")
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(8, 8, 8, 8)
-        lay.setSpacing(12)
+class DonePage(_Page):
+    HEADING = "You're all set"
+    SUBTITLE = "Add this to your MCP client (e.g. Claude Desktop), then restart it."
 
-        lay.addWidget(_h1("You're all set"))
-        lay.addWidget(_muted(
-            "Add this to your MCP client's config (e.g. Claude Desktop's "
-            "claude_desktop_config.json), then restart it."
-        ))
+    def build_body(self, lay: QVBoxLayout) -> None:
+        card = QFrame()
+        card.setObjectName("tierCard")
+        cl = QVBoxLayout(card)
+        cl.setContentsMargins(16, 16, 16, 16)
+        cl.setSpacing(12)
 
         self.snippet = QTextEdit()
         self.snippet.setReadOnly(True)
         self.snippet.setFont(QFont("Consolas", 10))
         self.snippet.setMinimumHeight(180)
-        lay.addWidget(self.snippet)
+        cl.addWidget(self.snippet)
 
         row = QHBoxLayout()
         copy = QPushButton("Copy to clipboard")
@@ -507,7 +530,9 @@ class DonePage(QWizardPage):
         copy.clicked.connect(self._copy)
         row.addWidget(copy)
         row.addStretch(1)
-        lay.addLayout(row)
+        cl.addLayout(row)
+
+        lay.addWidget(card)
 
         lay.addWidget(_muted(
             "Click Finish to open Memex. Drag folders or files into a collection, "
@@ -535,12 +560,9 @@ class SetupWizard(QWizard):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Memex Setup")
-        # Use ModernStyle on Windows; ClassicStyle would draw OS chrome.
         self.setWizardStyle(QWizard.WizardStyle.ModernStyle)
         self.setOption(QWizard.WizardOption.HaveHelpButton, False)
         self.setOption(QWizard.WizardOption.NoCancelButtonOnLastPage, True)
-        # The watermark/banner pixmaps would clash with our flat style.
-        self.setOption(QWizard.WizardOption.IgnoreSubTitles, False)
         icon_path = _resource_path("assets/icon.png")
         if icon_path.exists():
             self.setWindowIcon(QIcon(str(icon_path)))
@@ -550,7 +572,7 @@ class SetupWizard(QWizard):
         self.addPage(OllamaPage())
         self.addPage(PullPage())
         self.addPage(DonePage())
-        self.resize(760, 580)
+        self.resize(820, 620)
 
 
 def run_wizard_if_needed(parent_app: QApplication) -> bool:

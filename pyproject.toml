@@ -1,6 +1,6 @@
 [project]
 name = "memex-mcp"
-version = "0.1.1"
+version = "0.1.2"
 description = "Local semantic + keyword search over your codebases and documents, served to Claude (or any MCP client) over MCP."
 readme = "README.md"
 requires-python = ">=3.12"

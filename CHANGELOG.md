@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-04-20
+
+### Changed
+- **Premium dashboard redesign** — locked in a single visual language (Linear/Vercel-style): dark navy sidebar, warm off-white content area, white cards with crisp borders. All color pairs verified to pass WCAG AA.
+- **Dark sidebar** with brand wordmark, section caption, padded list items, and selection that uses the icon's navy as a strong fill.
+- **Cards are now obviously distinct from background** — fixed the v0.1.1 bug where a global `QWidget { background: transparent }` made white cards on a white wizard background invisible.
+- **Stronger borders** (zinc-300 instead of barely-visible zinc-200) so every card and input has a defined edge.
+- **Type hierarchy** — 22pt page titles, 16pt section heads, 12pt sub-heads. Uses Segoe UI Variable when available.
+- **Setup wizard pages** now inherit the dashboard look — content cards instead of floating widgets, hero icon on the welcome page, tier cards reused, MB-display download progress.
+- **Tabs** — selected tab uses the accent navy color and a real border so it stands apart from the content area.
+- **Status bar** styled with white background + subtle top border so it reads as part of the dashboard.
+
+### Fixed
+- Wizard pages no longer disappear into the background on first paint.
+- Tier card hover/selected states are clearly visible (light navy tint + 2px navy border on selected).
+
 ## [0.1.1] - 2026-04-20
 
 ### Changed
@@ -51,6 +67,7 @@ First public release.
 - Gemini API keys are stored in **Windows Credential Manager** under service `memex`, user `gemini-api-key` — never written to disk.
 - Frozen exes are unsigned. SmartScreen will warn on first run unless the downloaded zip is **Unblocked** (right-click → Properties → Unblock) before extraction.
 
-[Unreleased]: https://github.com/drhalto/memexmcp/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/drhalto/memexmcp/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/drhalto/memexmcp/releases/tag/v0.1.2
 [0.1.1]: https://github.com/drhalto/memexmcp/releases/tag/v0.1.1
 [0.1.0]: https://github.com/drhalto/memexmcp/releases/tag/v0.1.0
