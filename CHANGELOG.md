@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-04-20
+
+### Fixed
+- **Settings page now scrolls.** Wrapped the entire Settings tab in a `QScrollArea` so when content is taller than the window the page itself scrolls — previously the inner widgets compressed and showed their own internal scrollbars.
+- **Wizard pages now scroll.** Each wizard page body is wrapped in a `QScrollArea` (header stays pinned), so smaller windows don't clip content.
+- **Cards are visible.** Replaced `QGroupBox` with explicit `QFrame#card` widgets that get a real `QGraphicsDropShadowEffect` for depth on the cool off-white background.
+
+### Changed
+- Bigger base font (10pt → 11pt) and stronger type hierarchy (page titles 22pt → 26pt, section heads 12pt → 14pt).
+- Stronger borders (`#cbd5e1` slate-300 instead of `#d4d4d8`) so cards never blur into the background.
+- BG shifted from warm `#f5f5f4` to cooler `#f1f5f9` (slate-100) for higher contrast against white cards.
+- Modern slim scrollbars (12px wide, rounded thumb) instead of Windows' default chunky bars.
+- More generous spacing throughout — 28px page margins, 22px card padding, 20px gap between cards.
+- Wizard window minimum size enforced (720×540) so it never collapses below readable.
+- Tier card title font bumped to 12pt for clearer hierarchy.
+
 ## [0.1.2] - 2026-04-20
 
 ### Changed
@@ -67,7 +83,8 @@ First public release.
 - Gemini API keys are stored in **Windows Credential Manager** under service `memex`, user `gemini-api-key` — never written to disk.
 - Frozen exes are unsigned. SmartScreen will warn on first run unless the downloaded zip is **Unblocked** (right-click → Properties → Unblock) before extraction.
 
-[Unreleased]: https://github.com/drhalto/memexmcp/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/drhalto/memexmcp/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/drhalto/memexmcp/releases/tag/v0.1.3
 [0.1.2]: https://github.com/drhalto/memexmcp/releases/tag/v0.1.2
 [0.1.1]: https://github.com/drhalto/memexmcp/releases/tag/v0.1.1
 [0.1.0]: https://github.com/drhalto/memexmcp/releases/tag/v0.1.0

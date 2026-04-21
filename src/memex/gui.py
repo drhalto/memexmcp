@@ -1,9 +1,4 @@
-"""Memex desktop GUI.
-
-Layout:
-- Left: dark navy sidebar with collection list and a "new collection" button.
-- Right: tabs ("Sources" / "Settings") over a warm off-white content area.
-"""
+"""Memex desktop GUI."""
 
 from __future__ import annotations
 
@@ -17,7 +12,6 @@ from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
     QFrame,
-    QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QInputDialog,
@@ -30,6 +24,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QRadioButton,
+    QScrollArea,
     QSizePolicy,
     QSplitter,
     QStackedLayout,
@@ -50,14 +45,14 @@ from memex.indexer import add_repo, rebuild_embeddings, remove_repo, suggest_rep
 from memex.mcp_config import server_snippet
 from memex.paths import collections_dir, ensure_dirs
 from memex.store import open_db
-from memex.style import apply_style
+from memex.style import apply_card_shadow, apply_style
 
 
 DEFAULT_COLLECTION = "default"
 
 
 # ---------------------------------------------------------------------------
-# Resource helpers
+# Helpers
 # ---------------------------------------------------------------------------
 
 def _resource_path(rel: str) -> Path:
@@ -69,15 +64,40 @@ def _resource_path(rel: str) -> Path:
 
 def _app_icon() -> QIcon:
     png = _resource_path("assets/icon.png")
-    if png.exists():
-        return QIcon(str(png))
-    return QIcon()
+    return QIcon(str(png)) if png.exists() else QIcon()
 
 
 def _repolish(w: QWidget) -> None:
-    """Re-apply QSS after toggling a dynamic property."""
     w.style().unpolish(w)
     w.style().polish(w)
+
+
+def _card_with_title(title: str) -> tuple[QFrame, QVBoxLayout]:
+    """A white card frame with a section title at top. Returns (frame, body-layout)."""
+    card = QFrame()
+    card.setObjectName("card")
+    card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
+
+    lay = QVBoxLayout(card)
+    lay.setContentsMargins(24, 22, 24, 22)
+    lay.setSpacing(14)
+
+    head = QLabel(title)
+    head.setProperty("cardTitle", True)
+    lay.addWidget(head)
+
+    apply_card_shadow(card)
+    return card, lay
+
+
+def _scroll_page(content: QWidget) -> QScrollArea:
+    """Wrap a widget in a vertical-scroll area with a transparent border."""
+    scroll = QScrollArea()
+    scroll.setWidget(content)
+    scroll.setWidgetResizable(True)
+    scroll.setFrameShape(QFrame.Shape.NoFrame)
+    scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+    return scroll
 
 
 # ---------------------------------------------------------------------------
@@ -85,20 +105,18 @@ def _repolish(w: QWidget) -> None:
 # ---------------------------------------------------------------------------
 
 class DropZone(QFrame):
-    """Visual drop target. Click to browse; drop folders or files to add."""
-
     def __init__(self, on_dropped) -> None:
         super().__init__()
         self.setObjectName("dropZone")
         self.setAcceptDrops(True)
-        self.setMinimumHeight(150)
+        self.setMinimumHeight(160)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setProperty("hover", False)
         self._on_dropped = on_dropped
 
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(24, 22, 24, 22)
-        lay.setSpacing(6)
+        lay.setContentsMargins(28, 24, 28, 24)
+        lay.setSpacing(8)
 
         title = QLabel("Drop folders or files here")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -158,32 +176,26 @@ class CollectionView(QWidget):
         self._worker = None
         self._current_collection = DEFAULT_COLLECTION
 
+        # The Sources tab doesn't typically scroll (drop zone + table fill the
+        # space), so we keep a plain layout. The table grows; the rest is fixed.
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(24, 24, 24, 20)
-        lay.setSpacing(18)
+        lay.setContentsMargins(28, 28, 28, 22)
+        lay.setSpacing(20)
 
-        # ---- Header row ----
-        hdr_row = QVBoxLayout()
-        hdr_row.setSpacing(4)
-
-        name_row = QHBoxLayout()
-        name_row.setSpacing(10)
+        # Header
         self.collection_label = QLabel("default")
         self.collection_label.setProperty("h1", True)
-        name_row.addWidget(self.collection_label)
-        name_row.addStretch(1)
-        hdr_row.addLayout(name_row)
+        lay.addWidget(self.collection_label)
 
         self.count_label = QLabel("")
         self.count_label.setProperty("muted", True)
-        hdr_row.addWidget(self.count_label)
-        lay.addLayout(hdr_row)
+        lay.addWidget(self.count_label)
 
-        # ---- Drop zone ----
+        # Drop zone
         self.drop = DropZone(self._on_paths_dropped)
         lay.addWidget(self.drop)
 
-        # ---- Sources table (with empty-state swap) ----
+        # Table / empty state
         self.table_stack = QWidget()
         stack = QStackedLayout(self.table_stack)
         stack.setContentsMargins(0, 0, 0, 0)
@@ -194,7 +206,7 @@ class CollectionView(QWidget):
         )
         self.empty.setObjectName("emptyState")
         self.empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.empty.setMinimumHeight(200)
+        self.empty.setMinimumHeight(220)
         stack.addWidget(self.empty)
 
         self.table = QTableWidget(0, 4)
@@ -210,14 +222,14 @@ class CollectionView(QWidget):
         hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         hh.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         hh.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-        self.table.verticalHeader().setDefaultSectionSize(38)
+        self.table.verticalHeader().setDefaultSectionSize(40)
         stack.addWidget(self.table)
 
         lay.addWidget(self.table_stack, stretch=1)
 
-        # ---- Action row ----
+        # Action row
         btn_row = QHBoxLayout()
-        btn_row.setSpacing(10)
+        btn_row.setSpacing(12)
         self.embed_btn = QPushButton("Embed all")
         self.embed_btn.setProperty("primary", True)
         self.embed_btn.clicked.connect(self._on_embed_clicked)
@@ -233,15 +245,12 @@ class CollectionView(QWidget):
         btn_row.addWidget(self.cancel_btn)
         lay.addLayout(btn_row)
 
-        # ---- Progress ----
         self.progress = QProgressBar()
         self.progress.setValue(0)
         self.progress.setTextVisible(True)
         self.progress.setFormat("%p%")
         self.progress.setVisible(False)
         lay.addWidget(self.progress)
-
-    # -- selection --
 
     def set_collection(self, name: str) -> None:
         self._current_collection = name
@@ -285,8 +294,6 @@ class CollectionView(QWidget):
         else:
             self.count_label.setText("Empty collection")
 
-    # -- drop + selection handlers --
-
     def _on_paths_dropped(self, paths: list[Path]) -> None:
         conn = open_db()
         added = 0
@@ -316,8 +323,6 @@ class CollectionView(QWidget):
             (self._current_collection, *names),
         ).fetchall()
         return [(r["id"], r["name"]) for r in rows]
-
-    # -- embed lifecycle --
 
     def _on_embed_clicked(self) -> None:
         targets = self._selected_repo_ids()
@@ -397,7 +402,7 @@ class CollectionView(QWidget):
 
 
 # ---------------------------------------------------------------------------
-# TierCard (used in Settings and the wizard)
+# Tier card
 # ---------------------------------------------------------------------------
 
 class TierCard(QFrame):
@@ -416,11 +421,11 @@ class TierCard(QFrame):
         self.setObjectName("tierCard")
         self.setProperty("selected", False)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setMinimumHeight(82)
+        self.setMinimumHeight(86)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
         outer = QHBoxLayout(self)
-        outer.setContentsMargins(16, 14, 16, 14)
+        outer.setContentsMargins(18, 16, 18, 16)
         outer.setSpacing(14)
 
         self.radio = QRadioButton()
@@ -434,7 +439,7 @@ class TierCard(QFrame):
         title_row.setSpacing(10)
         name = QLabel(tier.label)
         nf = QFont()
-        nf.setPointSize(11)
+        nf.setPointSize(12)
         nf.setWeight(QFont.Weight.DemiBold)
         name.setFont(nf)
         title_row.addWidget(name)
@@ -469,7 +474,7 @@ class TierCard(QFrame):
 
 
 # ---------------------------------------------------------------------------
-# Settings tab
+# Settings tab — wrapped in a QScrollArea so the whole page scrolls
 # ---------------------------------------------------------------------------
 
 class SettingsView(QWidget):
@@ -480,24 +485,31 @@ class SettingsView(QWidget):
         self._main = main
         cfg = cfg_mod.load()
 
+        # Outer layout holds only the scroll area.
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(24, 24, 24, 24)
-        outer.setSpacing(20)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        # Inner widget that lives inside the scroll area.
+        inner = QWidget()
+        lay = QVBoxLayout(inner)
+        lay.setContentsMargins(28, 28, 28, 28)
+        lay.setSpacing(20)
 
         # Page header
         title = QLabel("Settings")
         title.setProperty("h1", True)
-        outer.addWidget(title)
+        lay.addWidget(title)
 
         subtitle = QLabel("Switch tiers, manage your Gemini key, and grab the MCP config for Claude.")
         subtitle.setProperty("muted", True)
-        outer.addWidget(subtitle)
+        lay.addWidget(subtitle)
 
-        # ---- Tier cards ----
-        tier_group = QGroupBox("Embedding tier")
-        tier_lay = QVBoxLayout(tier_group)
+        lay.addSpacing(4)
+
+        # ---- Tier card ----
+        tier_card, tier_lay = _card_with_title("Embedding tier")
         tier_lay.setSpacing(10)
-
         self._cards: dict[str, TierCard] = {}
         for tier_key, t in TIERS.items():
             card = TierCard(tier_key, t, recommended=(tier_key == "small"))
@@ -516,19 +528,18 @@ class SettingsView(QWidget):
         self.apply_tier_btn.clicked.connect(self._on_apply_tier)
         apply_row.addWidget(self.apply_tier_btn)
         tier_lay.addLayout(apply_row)
-        outer.addWidget(tier_group)
+        lay.addWidget(tier_card)
 
         # ---- Gemini key ----
-        key_group = QGroupBox("Gemini API key")
-        key_lay = QVBoxLayout(key_group)
-        key_lay.setSpacing(10)
+        key_card, key_lay = _card_with_title("Gemini API key")
         key_hint = QLabel(
-            "Optional. Stored in Windows Credential Manager (service: 'memex'), "
-            "never written to disk."
+            "Optional. Stored in Windows Credential Manager (service: 'memex'). "
+            "Never written to disk."
         )
         key_hint.setProperty("muted", True)
         key_hint.setWordWrap(True)
         key_lay.addWidget(key_hint)
+
         key_input_row = QHBoxLayout()
         key_input_row.setSpacing(10)
         self.key_edit = QLineEdit()
@@ -543,24 +554,23 @@ class SettingsView(QWidget):
         key_input_row.addWidget(self.key_save_btn)
         key_input_row.addWidget(self.key_clear_btn)
         key_lay.addLayout(key_input_row)
-        outer.addWidget(key_group)
+        lay.addWidget(key_card)
 
         # ---- Ollama host ----
-        host_group = QGroupBox("Ollama host")
-        host_lay = QHBoxLayout(host_group)
-        host_lay.setSpacing(10)
+        host_card, host_lay = _card_with_title("Ollama host")
+        host_input_row = QHBoxLayout()
+        host_input_row.setSpacing(10)
         self.host_edit = QLineEdit(cfg.ollama_host)
         self.host_save_btn = QPushButton("Save")
         self.host_save_btn.setProperty("primary", True)
         self.host_save_btn.clicked.connect(self._on_save_host)
-        host_lay.addWidget(self.host_edit, stretch=1)
-        host_lay.addWidget(self.host_save_btn)
-        outer.addWidget(host_group)
+        host_input_row.addWidget(self.host_edit, stretch=1)
+        host_input_row.addWidget(self.host_save_btn)
+        host_lay.addLayout(host_input_row)
+        lay.addWidget(host_card)
 
         # ---- MCP config ----
-        mcp_group = QGroupBox("MCP client configuration")
-        mcp_lay = QVBoxLayout(mcp_group)
-        mcp_lay.setSpacing(10)
+        mcp_card, mcp_lay = _card_with_title("MCP client configuration")
         hint = QLabel("Paste this into Claude Desktop's claude_desktop_config.json, then restart Claude.")
         hint.setProperty("muted", True)
         hint.setWordWrap(True)
@@ -569,7 +579,8 @@ class SettingsView(QWidget):
         self.mcp_preview.setReadOnly(True)
         self.mcp_preview.setFont(QFont("Consolas", 10))
         self.mcp_preview.setPlainText(server_snippet(cfg))
-        self.mcp_preview.setMinimumHeight(170)
+        self.mcp_preview.setMinimumHeight(190)
+        self.mcp_preview.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         mcp_lay.addWidget(self.mcp_preview)
         copy_row = QHBoxLayout()
         copy_row.addStretch(1)
@@ -578,9 +589,11 @@ class SettingsView(QWidget):
         copy_btn.clicked.connect(self._on_copy_mcp)
         copy_row.addWidget(copy_btn)
         mcp_lay.addLayout(copy_row)
-        outer.addWidget(mcp_group)
+        lay.addWidget(mcp_card)
 
-        outer.addStretch(1)
+        lay.addStretch(1)
+
+        outer.addWidget(_scroll_page(inner))
 
     # -- helpers --
 
@@ -644,20 +657,20 @@ class SettingsView(QWidget):
         set_gemini_key(key)
         self.key_edit.clear()
         self.key_edit.setPlaceholderText("••• stored •••")
-        gem_card = self._cards.get("gemini")
-        if gem_card is not None:
-            gem_card.setEnabled(True)
-            gem_card.setToolTip("")
+        gem = self._cards.get("gemini")
+        if gem is not None:
+            gem.setEnabled(True)
+            gem.setToolTip("")
         self.status_message.emit("Gemini key saved to Windows Credential Manager.")
 
     def _on_clear_key(self) -> None:
         clear_gemini_key()
         self.key_edit.clear()
         self.key_edit.setPlaceholderText("Paste key to save")
-        gem_card = self._cards.get("gemini")
-        if gem_card is not None:
-            gem_card.setEnabled(False)
-            gem_card.setToolTip("Set a Gemini API key to enable.")
+        gem = self._cards.get("gemini")
+        if gem is not None:
+            gem.setEnabled(False)
+            gem.setToolTip("Set a Gemini API key to enable.")
         self.status_message.emit("Gemini key removed.")
 
     def _on_save_host(self) -> None:
@@ -683,20 +696,19 @@ class Sidebar(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self.setObjectName("sidebar")
-        self.setMinimumWidth(240)
+        self.setMinimumWidth(250)
 
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(16, 22, 16, 20)
-        lay.setSpacing(14)
+        lay.setContentsMargins(18, 24, 18, 22)
+        lay.setSpacing(16)
 
-        # Brand row (icon + wordmark)
         brand_row = QHBoxLayout()
-        brand_row.setSpacing(10)
+        brand_row.setSpacing(12)
         icon_path = _resource_path("assets/icon.png")
         if icon_path.exists():
             icon_lbl = QLabel()
             pix = QPixmap(str(icon_path)).scaled(
-                28, 28,
+                32, 32,
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
@@ -708,7 +720,6 @@ class Sidebar(QWidget):
         brand_row.addStretch(1)
         lay.addLayout(brand_row)
 
-        # Section caption
         caption = QLabel("COLLECTIONS")
         caption.setProperty("caption", True)
         lay.addWidget(caption)
@@ -752,7 +763,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Memex")
         self.setWindowIcon(_app_icon())
-        self.resize(1220, 780)
+        self.resize(1240, 800)
         self.setMinimumSize(960, 640)
 
         ensure_dirs()
@@ -766,10 +777,9 @@ class MainWindow(QMainWindow):
         self.sidebar.new_collection_requested.connect(self._on_new_collection)
         splitter.addWidget(self.sidebar)
 
-        # Content area wraps the tabs in a QWidget so we control padding around them.
         content = QWidget()
         content_lay = QVBoxLayout(content)
-        content_lay.setContentsMargins(12, 12, 12, 12)
+        content_lay.setContentsMargins(14, 14, 14, 14)
         content_lay.setSpacing(0)
 
         self.tabs = QTabWidget()
@@ -778,11 +788,11 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.sources_view, "  Sources  ")
         self.tabs.addTab(self.settings_view, "  Settings  ")
         content_lay.addWidget(self.tabs)
-
         splitter.addWidget(content)
+
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
-        splitter.setSizes([260, 960])
+        splitter.setSizes([260, 980])
 
         self.setStatusBar(QStatusBar())
         self.sources_view.status_message.connect(self._show_status)
