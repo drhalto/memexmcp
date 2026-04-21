@@ -1,8 +1,41 @@
 [project]
 name = "memex-mcp"
 version = "0.1.0"
-description = "MemexMCP: local semantic + FTS search over your codebases and documents, served over MCP."
+description = "Local semantic + keyword search over your codebases and documents, served to Claude (or any MCP client) over MCP."
+readme = "README.md"
 requires-python = ">=3.12"
+license = { file = "LICENSE" }
+authors = [
+    { name = "drhalto" },
+]
+keywords = [
+    "mcp",
+    "model-context-protocol",
+    "embeddings",
+    "semantic-search",
+    "vector-search",
+    "rag",
+    "ollama",
+    "gemini",
+    "sqlite-vec",
+    "claude",
+    "claude-desktop",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Environment :: Win32 (MS Windows)",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Text Processing :: Indexing",
+]
 dependencies = [
     "sqlite-vec>=0.1.9",
     "httpx>=0.27",
@@ -13,6 +46,13 @@ dependencies = [
     "python-docx>=1.1",
     "selectolax>=0.3",
 ]
+
+[project.urls]
+Homepage  = "https://github.com/drhalto/memexmcp"
+Repository = "https://github.com/drhalto/memexmcp"
+Issues    = "https://github.com/drhalto/memexmcp/issues"
+Releases  = "https://github.com/drhalto/memexmcp/releases"
+Changelog = "https://github.com/drhalto/memexmcp/blob/main/CHANGELOG.md"
 
 [project.scripts]
 memex-cli = "memex.cli:app"
